@@ -13,20 +13,18 @@ using static Microsoft.ML.Transforms.Image.ImageResizingEstimator;
 namespace YOLOv4MLNet
 {
     //https://towardsdatascience.com/yolo-v4-optimal-speed-accuracy-for-object-detection-79896ed47b50
-    class Program
+    class Recognition
     {
         // model is available here:
         // https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/yolov4
         const string modelPath = @"D:\Prak4\models\yolov4.onnx";
-
-        const string imageFolder = @"Assets\Images";
 
         const string imageOutputFolder = @"Assets\Output";
 
         static readonly string[] classesNames = new string[] { "person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush" };
 
         static object locker = new object();
-        static async Task Main()
+        static void Recognize(string imageFolder)
         {
             Directory.CreateDirectory(imageOutputFolder);
             MLContext mlContext = new MLContext();
@@ -82,10 +80,10 @@ namespace YOLOv4MLNet
                     foreach (var res in results)
                     {
                         // draw predictions
-                        var x1 = res.BBox[0];
-                        var y1 = res.BBox[1];
-                        var x2 = res.BBox[2];
-                        var y2 = res.BBox[3];
+                        int x1 = (int)res.BBox[0];
+                        int y1 = (int)res.BBox[1];
+                        int x2 = (int)res.BBox[2];
+                        int y2 = (int)res.BBox[3];
                         g.DrawRectangle(Pens.Red, x1, y1, x2 - x1, y2 - y1);
                         using (var brushes = new SolidBrush(Color.FromArgb(50, Color.Red)))
                         {
@@ -94,6 +92,7 @@ namespace YOLOv4MLNet
 
                         g.DrawString(res.Label + " " + res.Confidence.ToString("0.00"),
                                      new Font("Arial", 12), Brushes.Blue, new PointF(x1, y1));
+                        Console.WriteLine(i + " image:" + res.Label + " iside a rectangle of " + x1 + " " + y1 + " and " + x2 + " " + y2);
                     }
                     bitmap.Save(Path.Combine(imageOutputFolder, Path.ChangeExtension(imageName[i], "_processed" + Path.GetExtension(imageName[i]))));
                 }
