@@ -13,7 +13,7 @@ using static Microsoft.ML.Transforms.Image.ImageResizingEstimator;
 namespace YOLOv4MLNet
 {
     //https://towardsdatascience.com/yolo-v4-optimal-speed-accuracy-for-object-detection-79896ed47b50
-    class Recognition
+    public class Recognition
     {
         // model is available here:
         // https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/yolov4
@@ -23,9 +23,9 @@ namespace YOLOv4MLNet
 
         static readonly string[] classesNames = new string[] { "person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush" };
 
-        static object locker = new object();
-        static void Recognize(string imageFolder)
+        public static Queue<PictureInfo> Recognize(string imageFolder)
         {
+            Queue<PictureInfo> output = new Queue<PictureInfo>();
             Directory.CreateDirectory(imageOutputFolder);
             MLContext mlContext = new MLContext();
 
@@ -92,14 +92,20 @@ namespace YOLOv4MLNet
 
                         g.DrawString(res.Label + " " + res.Confidence.ToString("0.00"),
                                      new Font("Arial", 12), Brushes.Blue, new PointF(x1, y1));
-                        Console.WriteLine(i + " image:" + res.Label + " iside a rectangle of " + x1 + " " + y1 + " and " + x2 + " " + y2);
+                        Coordinate coord = new Coordinate(x1, y1, x2, y2);
+                        PictureInfo  info = new PictureInfo(imageName[i], res.Label, coord);
+                        output.Enqueue(info);
+                        //Console.WriteLine(i + " image:" + res.Label + " iside a rectangle of " + x1 + " " + y1 + " and " + x2 + " " + y2);
                     }
-                    bitmap.Save(Path.Combine(imageOutputFolder, Path.ChangeExtension(imageName[i], "_processed" + Path.GetExtension(imageName[i]))));
+                    //bitmap.Save(Path.Combine(imageOutputFolder, Path.ChangeExtension(imageName[i], "_processed" + Path.GetExtension(imageName[i]))));
                 }
             });
 
+            Parallel.Invoke();
+
             sw.Stop();
             Console.WriteLine($"Done in {sw.ElapsedMilliseconds}ms.");
+            return output;
         }
     }
 }
