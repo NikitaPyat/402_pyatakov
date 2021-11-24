@@ -1,20 +1,32 @@
 ﻿using YOLOv4MLNet;
 using System;
 using System.Collections.Generic;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Lab1
 {
     class Program
     {
-        Queue<string> result = new Queue<string>();
+        static string path = @"Assets\Images";
         static void Main(string[] args)
         {
-            string path = @"Assets\Images";
-            Queue<string> result = Recognition.Recognize(path);
-
-            while( result.Count != 0)
+            Recognition rec = new Recognition();
+            Task.Run(() => rec.recognize(path));
+            PictureInfo info;
+            while (true)
             {
-                Console.WriteLine(result.Dequeue());
+                if (rec.queue.TryDequeue(out info))
+                {
+                    if (info.getName() == " ")
+                    {
+                        break;
+                    } else 
+                    {
+                        Console.WriteLine(info.getName() + " " + info.getClass());
+                    }
+                }
             }
         }
     }

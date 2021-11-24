@@ -8,6 +8,8 @@ using YOLOv4MLNet.DataStructures;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using static Microsoft.ML.Transforms.Image.ImageResizingEstimator;
+using System.Collections.Concurrent;
+using System.Threading;
 
 
 namespace YOLOv4MLNet
@@ -21,11 +23,12 @@ namespace YOLOv4MLNet
 
         const string imageOutputFolder = @"Assets\Output";
 
+        public ConcurrentQueue<PictureInfo> queue = new ConcurrentQueue<PictureInfo>();
+
         static readonly string[] classesNames = new string[] { "person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush" };
 
-        public static Queue<PictureInfo> Recognize(string imageFolder)
+        public void recognize(string imageFolder)
         {
-            Queue<PictureInfo> output = new Queue<PictureInfo>();
             Directory.CreateDirectory(imageOutputFolder);
             MLContext mlContext = new MLContext();
 
@@ -94,18 +97,24 @@ namespace YOLOv4MLNet
                                      new Font("Arial", 12), Brushes.Blue, new PointF(x1, y1));
                         Coordinate coord = new Coordinate(x1, y1, x2, y2);
                         PictureInfo  info = new PictureInfo(imageName[i], res.Label, coord);
-                        output.Enqueue(info);
+                        queue.Enqueue(info);
+                        //Console.WriteLine("after wait " + info.getName() + info.getClass());
+
+                        if(i == imageName.Length - 1 && res == results[results.Count - 1])
+                        {
+                            queue.Enqueue(new PictureInfo(" ", " ", new Coordinate(0, 0, 0, 0)));
+                            //Console.WriteLine("after wait " + "empty ", "empty ");
+                        }
                         //Console.WriteLine(i + " image:" + res.Label + " iside a rectangle of " + x1 + " " + y1 + " and " + x2 + " " + y2);
                     }
                     //bitmap.Save(Path.Combine(imageOutputFolder, Path.ChangeExtension(imageName[i], "_processed" + Path.GetExtension(imageName[i]))));
                 }
             });
 
-            Parallel.Invoke();
+
 
             sw.Stop();
             Console.WriteLine($"Done in {sw.ElapsedMilliseconds}ms.");
-            return output;
         }
     }
 }

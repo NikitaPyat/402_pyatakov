@@ -53,31 +53,44 @@ namespace WpfApp1
 
         private void start(object sender, RoutedEventArgs e)
         {
-            Queue<YOLOv4MLNet.PictureInfo> result = Recognition.Recognize(path);
-            while (result.Count != 0)
+            PictureInfo info;
+            Recognition rec = new Recognition();
+            Task.Run(() => rec.recognize(path));
+            while (true)
             {
-                picture_count++;
-                data.Add(result.Dequeue());
-                PictureInfo picture = data[data.Count() - 1];
-                string imageOutputFolder = "D:/Prak4/402_pyatakov/YOLOv4MLNet-master/WpfApp1/Output/";
-                
+                if (rec.queue.TryDequeue(out info))
+                {
+                    if (info.getName() == " ")
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        picture_count++;
+                        data.Add(info);
+                        PictureInfo picture = data[data.Count() - 1];
+                        string imageOutputFolder = "D:/Prak4/402_pyatakov/YOLOv4MLNet-master/WpfApp1/Output/";
+
                         var bitmap = new Bitmap(System.Drawing.Image.FromFile(System.IO.Path.Combine(path, picture.getName())));
-                    var g = Graphics.FromImage(bitmap);
-                    g.DrawRectangle(Pens.Red, (int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1(), (int)picture.Coordinate().getX2minusX1(), (int)picture.Coordinate().getY2minusY1());
-                    using (var brushes = new SolidBrush(System.Drawing.Color.FromArgb(50, System.Drawing.Color.Red)))
+                        var g = Graphics.FromImage(bitmap);
+                        g.DrawRectangle(Pens.Red, (int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1(), (int)picture.Coordinate().getX2minusX1(), (int)picture.Coordinate().getY2minusY1());
+                        using (var brushes = new SolidBrush(System.Drawing.Color.FromArgb(50, System.Drawing.Color.Red)))
                         {
                             g.FillRectangle(brushes, (int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1(), (int)picture.Coordinate().getX2minusX1(), (int)picture.Coordinate().getY2minusY1());
                         }
 
-                    g.DrawString(picture.getClass(), new Font("Arial", 12), System.Drawing.Brushes.Blue, new PointF((int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1()));
-                    bitmap.Save(System.IO.Path.Combine(imageOutputFolder, System.IO.Path.ChangeExtension(picture_count.ToString(), System.IO.Path.GetExtension(picture.getName()))));
+                        g.DrawString(picture.getClass(), new Font("Arial", 12), System.Drawing.Brushes.Blue, new PointF((int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1()));
+                        bitmap.Save(System.IO.Path.Combine(imageOutputFolder, System.IO.Path.ChangeExtension(picture_count.ToString(), System.IO.Path.GetExtension(picture.getName()))));
 
-                pictures.Add(picture_count.ToString() + ".jpg", picture.getClass());
+                        pictures.Add(picture_count.ToString() + ".jpg", picture.getClass());
 
 
-                if (!classes.Contains(data[data.Count() - 1].getClass()))
-                {
-                    classes.Add(data[data.Count() - 1].getClass());
+                        if (!classes.Contains(data[data.Count() - 1].getClass()))
+                        {
+                            classes.Add(data[data.Count() - 1].getClass());
+                        }
+                        Console.WriteLine(info.getName() + " " + info.getClass());
+                    }
                 }
             }
 
