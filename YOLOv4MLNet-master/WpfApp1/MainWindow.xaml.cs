@@ -1,35 +1,13 @@
-﻿using Consul;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
-using System;
-using System.IO;
-using System.Windows;
-using Microsoft.Win32;
-
-using Microsoft.ML;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using YOLOv4MLNet.DataStructures;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
-using static Microsoft.ML.Transforms.Image.ImageResizingEstimator;
-
+using System.Windows;
+using System.Windows.Media.Imaging;
 using YOLOv4MLNet;
 
 namespace WpfApp1
@@ -39,108 +17,265 @@ namespace WpfApp1
     /// </summary>
     public partial class MainWindow : Window
     {
-        List<YOLOv4MLNet.PictureInfo> data = new List<YOLOv4MLNet.PictureInfo>();
+        //List<YOLOv4MLNet.PictureInfo> data = new List<YOLOv4MLNet.PictureInfo>();
         List<string> classes = new List<string>();
+        CancellationTokenSource stop = new CancellationTokenSource();
+        ArraySegment<PictureObject> classItems;
         string chosenClass = " ";
-        string path = @"Assets\Images";
-        Dictionary<string, string> pictures = new Dictionary<string, string>();
+        string path_folder = @"Assets\Images";
+        //IDictionary pictures = new Dictionary<string, string>();
         int picture_count = 0;
         int currentPicture = 1;
+        int countClass;
         public MainWindow()
         {
             InitializeComponent();
+            start_recognize.IsEnabled = true;
+            using (var db = new PictureContext())
+            {
+                var query = db.PictureEntities;
+                if (query.Any())
+                {
+                    foreach (var item in query)
+                    {
+                        classes.Add(item.label);
+                    }
+                    AfterRecognize();
+                }
+            }
         }
 
-        private void start(object sender, RoutedEventArgs e)
+        private async void start(object sender, RoutedEventArgs e)
         {
             PictureInfo info;
             Recognition rec = new Recognition();
-            Task.Run(() => rec.recognize(path));
-            while (true)
+            ButtonsEnabled(false);
+            button_back.IsEnabled = false;
+            button_forward.IsEnabled = false;
+            await Task.Factory.StartNew(() =>
             {
-                if (rec.queue.TryDequeue(out info))
+                rec.recognize(path_folder, stop);
+                while (true)
                 {
-                    if (info.getName() == " ")
+                    if (rec.queue.TryDequeue(out info))
                     {
-                        break;
-                    }
-                    else
-                    {
-                        picture_count++;
-                        data.Add(info);
-                        PictureInfo picture = data[data.Count() - 1];
-                        string imageOutputFolder = "D:/Prak4/402_pyatakov/YOLOv4MLNet-master/WpfApp1/Output/";
-
-                        var bitmap = new Bitmap(System.Drawing.Image.FromFile(System.IO.Path.Combine(path, picture.getName())));
-                        var g = Graphics.FromImage(bitmap);
-                        g.DrawRectangle(Pens.Red, (int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1(), (int)picture.Coordinate().getX2minusX1(), (int)picture.Coordinate().getY2minusY1());
-                        using (var brushes = new SolidBrush(System.Drawing.Color.FromArgb(50, System.Drawing.Color.Red)))
+                        if (info.getName() == " " || stop.IsCancellationRequested)
                         {
-                            g.FillRectangle(brushes, (int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1(), (int)picture.Coordinate().getX2minusX1(), (int)picture.Coordinate().getY2minusY1());
+                            break;
                         }
-
-                        g.DrawString(picture.getClass(), new Font("Arial", 12), System.Drawing.Brushes.Blue, new PointF((int)picture.Coordinate().getX1(), (int)picture.Coordinate().getY1()));
-                        bitmap.Save(System.IO.Path.Combine(imageOutputFolder, System.IO.Path.ChangeExtension(picture_count.ToString(), System.IO.Path.GetExtension(picture.getName()))));
-
-                        pictures.Add(picture_count.ToString() + ".jpg", picture.getClass());
-
-
-                        if (!classes.Contains(data[data.Count() - 1].getClass()))
+                        else
                         {
-                            classes.Add(data[data.Count() - 1].getClass());
+                            picture_count++;
+                            //data.Add(info);
+                            //PictureInfo picture = data[data.Count() - 1];
+                            string imageOutputFolder = "D:/Prak4/402_pyatakov/YOLOv4MLNet-master/WpfApp1/Output/";
+
+                            var bitmap = new Bitmap(System.Drawing.Image.FromFile(System.IO.Path.Combine(path_folder, info.getName())));
+                            var g = Graphics.FromImage(bitmap);
+                            g.DrawRectangle(Pens.Red, (int)info.Coordinate().getX1(), (int)info.Coordinate().getY1(), (int)info.Coordinate().getX2minusX1(), (int)info.Coordinate().getY2minusY1());
+                            using (var brushes = new SolidBrush(System.Drawing.Color.FromArgb(50, System.Drawing.Color.Red)))
+                            {
+                                g.FillRectangle(brushes, (int)info.Coordinate().getX1(), (int)info.Coordinate().getY1(), (int)info.Coordinate().getX2minusX1(), (int)info.Coordinate().getY2minusY1());
+                            }
+
+                            g.DrawString(info.getClass(), new Font("Arial", 12), System.Drawing.Brushes.Blue, new PointF((int)info.Coordinate().getX1(), (int)info.Coordinate().getY1()));
+                            bitmap.Save(System.IO.Path.Combine(imageOutputFolder, System.IO.Path.ChangeExtension(picture_count.ToString(), System.IO.Path.GetExtension(info.getName()))));
+
+
+
+
+                            if (!classes.Contains(info.getClass()))
+                            {
+                                classes.Add(info.getClass());
+                            }
+
+                            using (var db = new PictureContext())
+                            {
+                                var query = db.PictureEntities.Where(entity => entity.x1 == info.Coordinate().getX1() && entity.x2 == info.Coordinate().getX2() &&
+                                entity.y1 == info.Coordinate().getY1() && entity.y2 == info.Coordinate().getY2());
+                                if (query.Any())
+                                {
+                                    foreach (var item in query)
+                                    {
+                                        if (!Enumerable.SequenceEqual(item.picture, ImageToByte(bitmap)))
+                                        {
+                                            db.PictureEntities.Add(new PictureObject
+                                            {
+                                                x1 = info.Coordinate().getX1(),
+                                                x2 = info.Coordinate().getX2(),
+                                                y1 = info.Coordinate().getY1(),
+                                                y2 = info.Coordinate().getY2(),
+                                                picture = ImageToByte(bitmap),
+                                                confidence = 0.95,
+                                                label = info.getClass()
+                                            });
+                                            db.SaveChanges();
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    db.PictureEntities.Add(new PictureObject
+                                    {
+                                        x1 = info.Coordinate().getX1(),
+                                        x2 = info.Coordinate().getX2(),
+                                        y1 = info.Coordinate().getY1(),
+                                        y2 = info.Coordinate().getY2(),
+                                        picture = ImageToByte(bitmap),
+                                        confidence = 0.95,
+                                        label = info.getClass()
+                                    });
+                                    db.SaveChanges();
+                                }
+                            }
+
                         }
-                        Console.WriteLine(info.getName() + " " + info.getClass());
                     }
                 }
-            }
+            }, stop.Token);
+
+            AfterRecognize();
+        }
+
+        private void Stop(object sender, RoutedEventArgs e)
+        {
+            stop.Cancel();
+            AfterRecognize();
+        }
+
+        private void AfterRecognize()
+        {
+            ButtonsEnabled(true);
 
             for (int i = 0; i < classes.Count(); i++)
             {
-                comboBox.Items.Add(classes[i]);
+                if (!labels.Items.Contains(classes[i]))
+                {
+                    labels.Items.Add(classes[i]);
+                }
             }
+        }
+
+        private void ButtonsEnabled(Boolean recognize)
+        {
+            start_recognize.IsEnabled = recognize;
+            stop_recognize.IsEnabled = !recognize;
+            path.IsEnabled = recognize;
+            labels.IsEnabled = recognize;
+            choose_label.IsEnabled = recognize;
+            makeempty.IsEnabled = recognize;
         }
 
         private void ChooseClass(object sender, RoutedEventArgs e)
         {
-            if (comboBox.SelectedItem != null)
+            if (labels.SelectedItem != null)
             {
-                chosenClass = comboBox.SelectedItem.ToString();
+                chosenClass = labels.SelectedItem.ToString();
+                using (var db = new PictureContext())
+                {
+                    classItems = db.PictureEntities.Where(entity => entity.label == chosenClass).ToArray();
+                    db.SaveChanges();
+                }
                 currentPicture = 0;
+                countClass = classItems.Count;
+                button_back.IsEnabled = false;
+                button_forward.IsEnabled = false;
                 forward(sender, e);
             }
         }
 
         private void back(object sender, RoutedEventArgs e)
         {
-            while(currentPicture != 1)
+            while (currentPicture != 0)
             {
                 currentPicture--;
-                if (pictures[currentPicture.ToString() + ".jpg"] == chosenClass)
+
+                for (int i = 0; i < countClass; i++)
                 {
-                    image.Source = new BitmapImage(new Uri("D:/Prak4/402_pyatakov/YOLOv4MLNet-master/WpfApp1/Output/" + currentPicture.ToString() + ".jpg"));
-                    break;
+                    if (i == currentPicture - 1)
+                    {
+                        image.Source = ToImage(classItems[i].picture);
+                    }
                 }
+                break;
             }
+
+            changeButtons();
         }
 
         private void forward(object sender, RoutedEventArgs e)
         {
-            while (currentPicture != pictures.Count())
+            while (currentPicture != countClass)
             {
                 currentPicture++;
-                if (pictures[currentPicture.ToString() + ".jpg"] == chosenClass)
+                for (int i = 0; i < countClass; i++)
                 {
-                    image.Source = new BitmapImage(new Uri("D:/Prak4/402_pyatakov/YOLOv4MLNet-master/WpfApp1/Output/" + currentPicture.ToString() + ".jpg"));
-                    break;
+                    if (i == currentPicture - 1)
+                    {
+                        image.Source = ToImage(classItems[i].picture);
+                    }
                 }
+                break;
             }
+
+            changeButtons();
+        }
+
+        private void changeButtons()
+        {
+            button_back.IsEnabled = currentPicture > 1;
+            button_forward.IsEnabled = currentPicture != countClass;
         }
 
         private void ChoosePath(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
             if (openFileDialog.ShowDialog() == true)
-                path = openFileDialog.FileName;
+                path_folder = openFileDialog.FileName;
+        }
+
+        public static byte[] ImageToByte(Bitmap img)
+        {
+            using (var stream = new MemoryStream())
+            {
+                img.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                return stream.ToArray();
+            }
+        }
+
+        public BitmapImage ToImage(byte[] array)
+        {
+            using (var ms = new System.IO.MemoryStream(array))
+            {
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad; // here
+                image.StreamSource = ms;
+                image.EndInit();
+                return image;
+            }
+        }
+
+        private void MakeBaseEmpty(object sender, RoutedEventArgs e)
+        {
+            using (var db = new PictureContext())
+            {
+                var query = db.PictureEntities;
+                if (query.Any())
+                {
+                    foreach (var item in query)
+                    {
+                        db.Remove(item);
+                    }
+                    db.SaveChanges();
+
+                    ButtonsEnabled(true);
+                    button_back.IsEnabled = false;
+                    button_forward.IsEnabled = false;
+                    classes.Clear();
+                    labels.Items.Clear();
+                }
+            }
         }
     }
 }

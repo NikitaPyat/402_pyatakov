@@ -28,6 +28,16 @@ namespace YOLOv4MLNet
             return y1;
         }
 
+        public double getX2()
+        {
+            return x2;
+        }
+
+        public double getY2()
+        {
+            return y2;
+        }
+
         public double getX2minusX1()
         {
             return x2 - x1;

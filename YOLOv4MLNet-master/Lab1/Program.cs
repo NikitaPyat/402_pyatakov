@@ -1,7 +1,5 @@
 ﻿using YOLOv4MLNet;
 using System;
-using System.Collections.Generic;
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,8 +10,9 @@ namespace Lab1
         static string path = @"Assets\Images";
         static void Main(string[] args)
         {
+            CancellationTokenSource stop = new CancellationTokenSource();
             Recognition rec = new Recognition();
-            Task.Run(() => rec.recognize(path));
+            Task.Run(() => rec.recognize(path, stop));
             PictureInfo info;
             while (true)
             {

@@ -7,13 +7,14 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
-        <Button x:Name="button" Content="Начать распознавание " HorizontalAlignment="Left" Margin="544,110,0,0" VerticalAlignment="Top" Click="start" Width="155"/>
-        <Button x:Name="button1" Content="Остановить распознавание" HorizontalAlignment="Left" Margin="544,175,0,0" VerticalAlignment="Top"/>
-        <Button x:Name="button2" Content="Задать путь до файлов" HorizontalAlignment="Left" Margin="48,10,0,0" VerticalAlignment="Top" Click="ChoosePath"/>
-        <ComboBox x:Name="comboBox" HorizontalAlignment="Left" Margin="466,312,0,0" VerticalAlignment="Top" Width="84"/>
-        <Button x:Name="button3" Content="Выбор класса" HorizontalAlignment="Left" VerticalAlignment="Top" Click="ChooseClass" Margin="570,308,0,0" Height="26"/>
+        <Button x:Name="start_recognize" Content="Начать распознавание " HorizontalAlignment="Left" Margin="544,110,0,0" VerticalAlignment="Top" Click="start" Width="155" IsEnabled="false"/>
+        <Button x:Name="stop_recognize" Content="Остановить распознавание" HorizontalAlignment="Left" Margin="544,175,0,0" VerticalAlignment="Top" IsEnabled="false" Click="Stop"/>
+        <Button x:Name="path" Content="Задать путь до файлов" HorizontalAlignment="Left" Margin="48,10,0,0" VerticalAlignment="Top" Click="ChoosePath"/>
+        <ComboBox x:Name="labels" HorizontalAlignment="Left" Margin="466,312,0,0" VerticalAlignment="Top" Width="84" IsEnabled="false"/>
+        <Button x:Name="choose_label" Content="Выбор класса" HorizontalAlignment="Left" VerticalAlignment="Top" Click="ChooseClass" Margin="570,308,0,0" Height="26" IsEnabled="false"/>
         <Image x:Name="image" Source="/cars road.jpg"  HorizontalAlignment="Left" Margin="48,39,0,60" Width="343"/>
-        <Button x:Name="button_back" Content="Назад" HorizontalAlignment="Left" Margin="237,380,0,0" VerticalAlignment="Top" Click="back" />
-        <Button x:Name="button_forward" Content="Вперед" HorizontalAlignment="Left" Margin="170,380,0,0" VerticalAlignment="Top" Click="forward" />
+        <Button x:Name="button_back" Content="Назад" HorizontalAlignment="Left" Margin="237,380,0,0" VerticalAlignment="Top" Click="back" IsEnabled="false"/>
+        <Button x:Name="button_forward" Content="Вперед" HorizontalAlignment="Left" Margin="170,380,0,0" VerticalAlignment="Top" Click="forward" IsEnabled="false"/>
+        <Button x:Name="makeempty" Content="Очистить базу" HorizontalAlignment="Left" Margin="48,51,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.225,-0.498" Width="135" Click="MakeBaseEmpty"/>
     </Grid>
 </Window>
