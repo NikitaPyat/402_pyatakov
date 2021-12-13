@@ -34,14 +34,14 @@ namespace WpfApp1
             using (var db = new PictureContext())
             {
                 var query = db.PictureEntities;
-                if (query.Any())
+                /*if (query.Any())
                 {
                     foreach (var item in query)
                     {
                         classes.Add(item.label);
                     }
                     AfterRecognize();
-                }
+                }*/
             }
         }
 
