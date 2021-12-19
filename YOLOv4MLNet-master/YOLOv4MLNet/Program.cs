@@ -1,16 +1,13 @@
 ﻿using Microsoft.ML;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using YOLOv4MLNet.DataStructures;
-using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
-using static Microsoft.ML.Transforms.Image.ImageResizingEstimator;
-using System.Collections.Concurrent;
 using System.Threading;
-
+using YOLOv4MLNet.DataStructures;
+using static Microsoft.ML.Transforms.Image.ImageResizingEstimator;
 
 namespace YOLOv4MLNet
 {
@@ -27,14 +24,11 @@ namespace YOLOv4MLNet
 
         static readonly string[] classesNames = new string[] { "person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush" };
 
-        public void recognize(string imageFolder, CancellationTokenSource cancel)
+        public void recognize(Bitmap bitmap, CancellationTokenSource cancel)
         {
             if (cancel.IsCancellationRequested) return;
             Directory.CreateDirectory(imageOutputFolder);
             MLContext mlContext = new MLContext();
-
-            ParallelOptions po = new ParallelOptions();
-            po.CancellationToken = cancel.Token;
 
             // model is available here:
             // https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/yolov4
@@ -77,37 +71,22 @@ namespace YOLOv4MLNet
 
             try
             {
-                Parallel.For(0, imageName.Length, po, i =>
+                var predictionEngine = mlContext.Model.CreatePredictionEngine<YoloV4BitmapData, YoloV4Prediction>(model);
+                var predict = predictionEngine.Predict(new YoloV4BitmapData() { Image = bitmap });
+                var results = predict.GetResults(classesNames, 0.3f, 0.7f);
+                //Console.WriteLine("Image " + imageName[i] + " has " + results.Count + " objects");
+
+                foreach (var res in results)
                 {
-                    var predictionEngine = mlContext.Model.CreatePredictionEngine<YoloV4BitmapData, YoloV4Prediction>(model);
-                    var bitmap = new Bitmap(Image.FromFile(Path.Combine(imageFolder, imageName[i])));
-                    var predict = predictionEngine.Predict(new YoloV4BitmapData() { Image = bitmap });
-                    var results = predict.GetResults(classesNames, 0.3f, 0.7f);
-                    Console.WriteLine("Image " + imageName[i] + " has " + results.Count + " objects");
-
-                    using (var g = Graphics.FromImage(bitmap))
-                    {
-                        foreach (var res in results)
-                        {
-                            // draw predictions
-                            int x1 = (int)res.BBox[0];
-                            int y1 = (int)res.BBox[1];
-                            int x2 = (int)res.BBox[2];
-                            int y2 = (int)res.BBox[3];
-                            g.DrawRectangle(Pens.Red, x1, y1, x2 - x1, y2 - y1);
-                            using (var brushes = new SolidBrush(Color.FromArgb(50, Color.Red)))
-                            {
-                                g.FillRectangle(brushes, x1, y1, x2 - x1, y2 - y1);
-                            }
-
-                            g.DrawString(res.Label + " " + res.Confidence.ToString("0.00"),
-                                         new Font("Arial", 12), Brushes.Blue, new PointF(x1, y1));
-                            Coordinate coord = new Coordinate(x1, y1, x2, y2);
-                            PictureInfo info = new PictureInfo(imageName[i], res.Label, coord);
-                            queue.Enqueue(info);
-                        }
-                    }
-                });
+                    // draw predictions
+                    int x1 = (int)res.BBox[0];
+                    int y1 = (int)res.BBox[1];
+                    int x2 = (int)res.BBox[2];
+                    int y2 = (int)res.BBox[3];
+                    Coordinate coord = new Coordinate(x1, y1, x2, y2);
+                    PictureInfo info = new PictureInfo(bitmap, res.Label, coord);
+                    queue.Enqueue(info);
+                }
             }
             catch (OperationCanceledException e)
             {
@@ -118,7 +97,7 @@ namespace YOLOv4MLNet
                 cancel.Dispose();
             }
 
-            queue.Enqueue(new PictureInfo(" ", " ", new Coordinate(0, 0, 0, 0)));
+            queue.Enqueue(new PictureInfo(bitmap, " ", new Coordinate(0, 0, 0, 0)));
 
             sw.Stop();
             Console.WriteLine($"Done in {sw.ElapsedMilliseconds}ms.");

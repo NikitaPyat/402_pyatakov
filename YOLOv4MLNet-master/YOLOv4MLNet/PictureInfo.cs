@@ -1,30 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 
 namespace YOLOv4MLNet
 {
     public class PictureInfo
     {
-        string picture_name;
+        Bitmap image { get; set; }
         string class_obj;
         Coordinate coordinate;
 
-        public PictureInfo(string name, string cl, Coordinate coord)
+        public PictureInfo(Bitmap picture, string cl, Coordinate coord)
         {
-            picture_name = name;
+            image = picture;
             class_obj = cl;
             coordinate = coord;
+        }
+
+        public Bitmap getImage()
+        {
+            return image;
         }
 
         public string getClass()
         {
             return class_obj;
-        }
-
-        public string getName()
-        {
-            return picture_name;
         }
 
         public Coordinate Coordinate()

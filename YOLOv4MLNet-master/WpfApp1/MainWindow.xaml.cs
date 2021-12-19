@@ -1,9 +1,14 @@
 ﻿using Microsoft.Win32;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,123 +22,85 @@ namespace WpfApp1
     /// </summary>
     public partial class MainWindow : Window
     {
-        //List<YOLOv4MLNet.PictureInfo> data = new List<YOLOv4MLNet.PictureInfo>();
-        List<string> classes = new List<string>();
         CancellationTokenSource stop = new CancellationTokenSource();
-        ArraySegment<PictureObject> classItems;
+        List<PictureObject> classItems = new List<PictureObject>();
         string chosenClass = " ";
         string path_folder = @"Assets\Images";
-        //IDictionary pictures = new Dictionary<string, string>();
         int picture_count = 0;
         int currentPicture = 1;
         int countClass;
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        public static extern bool DeleteObject(IntPtr hObject);
         public MainWindow()
         {
             InitializeComponent();
-            start_recognize.IsEnabled = true;
-            using (var db = new PictureContext())
+            labels.Items.Clear();
+            GetPhotos();
+        }
+
+        private async void GetPhotos()
+        {
+            HttpClientHandler clientHandler = new HttpClientHandler();
+            clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+
+            HttpClient client = new HttpClient(clientHandler);
+
+            string json = "";
+            try
             {
-                var query = db.PictureEntities;
-                /*if (query.Any())
+                json = await client.GetStringAsync("http://localhost:5000/Pictures");
+
+                PictureObject[] deserializedPictures = JsonConvert.DeserializeObject<PictureObject[]>(json);
+                for (int i = 0; i < deserializedPictures.Length; i++)
                 {
-                    foreach (var item in query)
+                    if (!labels.Items.Contains(deserializedPictures[i].label))
                     {
-                        classes.Add(item.label);
+                        labels.Items.Add(deserializedPictures[i].label);
                     }
-                    AfterRecognize();
-                }*/
+                }
+
+                AfterRecognize();
+            }
+            catch (Exception e)
+            {
+                return;
             }
         }
 
         private async void start(object sender, RoutedEventArgs e)
         {
-            PictureInfo info;
-            Recognition rec = new Recognition();
+            var imageName = new string[] { "kite.jpg", "dog_cat.jpg", "cars road.jpg", "ski.jpg", "ski2.jpg" };
+
             ButtonsEnabled(false);
             button_back.IsEnabled = false;
             button_forward.IsEnabled = false;
-            await Task.Factory.StartNew(() =>
+            var tasks = new Task[imageName.Length];
+
+            for (int i = 0; i < imageName.Length; i++)
             {
-                rec.recognize(path_folder, stop);
-                while (true)
-                {
-                    if (rec.queue.TryDequeue(out info))
+                if (stop.IsCancellationRequested) return;
+                tasks[i] = Task.Factory.StartNew(async pi => {
+                    if (stop.IsCancellationRequested)
                     {
-                        if (info.getName() == " " || stop.IsCancellationRequested)
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            picture_count++;
-                            //data.Add(info);
-                            //PictureInfo picture = data[data.Count() - 1];
-                            string imageOutputFolder = "D:/Prak4/402_pyatakov/YOLOv4MLNet-master/WpfApp1/Output/";
-
-                            var bitmap = new Bitmap(System.Drawing.Image.FromFile(System.IO.Path.Combine(path_folder, info.getName())));
-                            var g = Graphics.FromImage(bitmap);
-                            g.DrawRectangle(Pens.Red, (int)info.Coordinate().getX1(), (int)info.Coordinate().getY1(), (int)info.Coordinate().getX2minusX1(), (int)info.Coordinate().getY2minusY1());
-                            using (var brushes = new SolidBrush(System.Drawing.Color.FromArgb(50, System.Drawing.Color.Red)))
-                            {
-                                g.FillRectangle(brushes, (int)info.Coordinate().getX1(), (int)info.Coordinate().getY1(), (int)info.Coordinate().getX2minusX1(), (int)info.Coordinate().getY2minusY1());
-                            }
-
-                            g.DrawString(info.getClass(), new Font("Arial", 12), System.Drawing.Brushes.Blue, new PointF((int)info.Coordinate().getX1(), (int)info.Coordinate().getY1()));
-                            bitmap.Save(System.IO.Path.Combine(imageOutputFolder, System.IO.Path.ChangeExtension(picture_count.ToString(), System.IO.Path.GetExtension(info.getName()))));
-
-
-
-
-                            if (!classes.Contains(info.getClass()))
-                            {
-                                classes.Add(info.getClass());
-                            }
-
-                            using (var db = new PictureContext())
-                            {
-                                var query = db.PictureEntities.Where(entity => entity.x1 == info.Coordinate().getX1() && entity.x2 == info.Coordinate().getX2() &&
-                                entity.y1 == info.Coordinate().getY1() && entity.y2 == info.Coordinate().getY2());
-                                if (query.Any())
-                                {
-                                    foreach (var item in query)
-                                    {
-                                        if (!Enumerable.SequenceEqual(item.picture, ImageToByte(bitmap)))
-                                        {
-                                            db.PictureEntities.Add(new PictureObject
-                                            {
-                                                x1 = info.Coordinate().getX1(),
-                                                x2 = info.Coordinate().getX2(),
-                                                y1 = info.Coordinate().getY1(),
-                                                y2 = info.Coordinate().getY2(),
-                                                picture = ImageToByte(bitmap),
-                                                confidence = 0.95,
-                                                label = info.getClass()
-                                            });
-                                            db.SaveChanges();
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    db.PictureEntities.Add(new PictureObject
-                                    {
-                                        x1 = info.Coordinate().getX1(),
-                                        x2 = info.Coordinate().getX2(),
-                                        y1 = info.Coordinate().getY1(),
-                                        y2 = info.Coordinate().getY2(),
-                                        picture = ImageToByte(bitmap),
-                                        confidence = 0.95,
-                                        label = info.getClass()
-                                    });
-                                    db.SaveChanges();
-                                }
-                            }
-
-                        }
+                        return;
                     }
-                }
-            }, stop.Token);
+                    int idx = (int)pi;
 
+                    HttpClientHandler clientHandler = new HttpClientHandler();
+                    clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+                    HttpClient client = new HttpClient(clientHandler);
+                    var bitmap = new Bitmap(Image.FromFile(Path.Combine(path_folder, imageName[idx])));
+                    var bytes = ImageToByte(bitmap);
+
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(bytes);
+                    var data = new System.Net.Http.StringContent(json, Encoding.Default, "application/json");
+                    HttpResponseMessage response = new();
+                    response = await client.PostAsync("http://localhost:5000/Pictures/Add", data);
+                    MessageBox.Show(response.ToString());
+                }, i, stop.Token);
+            }
+            Task.WaitAll(tasks);
             AfterRecognize();
         }
 
@@ -143,20 +110,34 @@ namespace WpfApp1
             AfterRecognize();
         }
 
-        private void AfterRecognize()
+        private async void AfterRecognize()
         {
             ButtonsEnabled(true);
 
-            for (int i = 0; i < classes.Count(); i++)
+            HttpClientHandler clientHandler = new HttpClientHandler();
+            clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+            string json = "";
+            HttpClient client = new HttpClient(clientHandler);
+            try
             {
-                if (!labels.Items.Contains(classes[i]))
+                json = await client.GetStringAsync("http://localhost:5000/Pictures");
+                //int j = 0;
+                PictureObject[] deserializedPictures = JsonConvert.DeserializeObject<PictureObject[]>(json);
+                for (int i = 0; i < deserializedPictures.Length; i++)
                 {
-                    labels.Items.Add(classes[i]);
+                    if (!labels.Items.Contains(deserializedPictures[i].label))
+                    {
+                        labels.Items.Add(deserializedPictures[i].label);
+                    }
                 }
+            }
+            catch (Exception)
+            {
+                return;
             }
         }
 
-        private void ButtonsEnabled(Boolean recognize)
+        private void ButtonsEnabled(bool recognize)
         {
             start_recognize.IsEnabled = recognize;
             stop_recognize.IsEnabled = !recognize;
@@ -166,16 +147,34 @@ namespace WpfApp1
             makeempty.IsEnabled = recognize;
         }
 
-        private void ChooseClass(object sender, RoutedEventArgs e)
+        private async void ChooseClass(object sender, RoutedEventArgs e)
         {
+            classItems.Clear();
             if (labels.SelectedItem != null)
             {
                 chosenClass = labels.SelectedItem.ToString();
-                using (var db = new PictureContext())
+                HttpClientHandler clientHandler = new HttpClientHandler();
+                clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+                string json = "";
+                HttpClient client = new HttpClient(clientHandler);
+                try
                 {
-                    classItems = db.PictureEntities.Where(entity => entity.label == chosenClass).ToArray();
-                    db.SaveChanges();
+                    json = await client.GetStringAsync("http://localhost:5000/Pictures");
+                    //int j = 0;
+                    PictureObject[] deserializedPictures = JsonConvert.DeserializeObject<PictureObject[]>(json);
+                    for (int i = 0; i < deserializedPictures.Length; i++)
+                    {
+                        if (chosenClass == deserializedPictures[i].label)
+                        {
+                            classItems.Add(deserializedPictures[i]);
+                        }
+                    }
                 }
+                catch (Exception)
+                {
+                    return;
+                }
+
                 currentPicture = 0;
                 countClass = classItems.Count;
                 button_back.IsEnabled = false;
@@ -234,6 +233,27 @@ namespace WpfApp1
                 path_folder = openFileDialog.FileName;
         }
 
+        private async void MakeBaseEmpty(object sender, RoutedEventArgs e)
+        {
+            HttpClientHandler clientHandler = new HttpClientHandler();
+            clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+            string json = "";
+            HttpClient client = new HttpClient(clientHandler);
+            try
+            {
+                var r = await client.DeleteAsync("http://localhost:5000/Pictures/clean");
+                r.EnsureSuccessStatusCode();
+                ButtonsEnabled(true);
+                button_back.IsEnabled = false;
+                button_forward.IsEnabled = false;
+                labels.Items.Clear();
+            }
+            catch (Exception ex)
+            {
+                //MessageBox.Show(ex.ToString());
+            }
+        }
+
         public static byte[] ImageToByte(Bitmap img)
         {
             using (var stream = new MemoryStream())
@@ -245,36 +265,24 @@ namespace WpfApp1
 
         public BitmapImage ToImage(byte[] array)
         {
-            using (var ms = new System.IO.MemoryStream(array))
+            Bitmap bmp;
+            using (var ms = new MemoryStream(array))
             {
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad; // here
-                image.StreamSource = ms;
-                image.EndInit();
-                return image;
+                bmp = new Bitmap(ms);
             }
-        }
-
-        private void MakeBaseEmpty(object sender, RoutedEventArgs e)
-        {
-            using (var db = new PictureContext())
+            using (var memory = new MemoryStream())
             {
-                var query = db.PictureEntities;
-                if (query.Any())
-                {
-                    foreach (var item in query)
-                    {
-                        db.Remove(item);
-                    }
-                    db.SaveChanges();
+                bmp.Save(memory, ImageFormat.Png);
+                memory.Position = 0;
 
-                    ButtonsEnabled(true);
-                    button_back.IsEnabled = false;
-                    button_forward.IsEnabled = false;
-                    classes.Clear();
-                    labels.Items.Clear();
-                }
+                var bitmapImage = new BitmapImage();
+                bitmapImage.BeginInit();
+                bitmapImage.StreamSource = memory;
+                bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                bitmapImage.EndInit();
+                bitmapImage.Freeze();
+
+                return bitmapImage;
             }
         }
     }

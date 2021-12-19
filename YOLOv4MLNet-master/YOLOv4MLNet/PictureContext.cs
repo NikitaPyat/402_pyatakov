@@ -11,7 +11,7 @@ namespace YOLOv4MLNet
 
         protected override void OnConfiguring(DbContextOptionsBuilder o)
         {
-            o.UseSqlite("Data Source=D:\\Prak4\\402_pyatakov\\YOLOv4MLNet-master\\YOLOv4MLNet\\pictureBase.db");
+            o.UseSqlite("Data Source=D:\\Prak4\\402_pyatakov(4.1)\\YOLOv4MLNet-master\\YOLOv4MLNet\\pictureBase.db");
         }
     }
 }
